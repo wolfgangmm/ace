@@ -27,7 +27,7 @@ var Mode = function(name, desc, extensions) {
         var re = "^.*\\.(" + extensions + ")$";
     }   
 
-    this.extRe = new RegExp(re, "g");
+    this.extRe = new RegExp(re, "gi");
 };
 
 Mode.prototype.supportsFile = function(filename) {
@@ -35,6 +35,7 @@ Mode.prototype.supportsFile = function(filename) {
 };
 
 var modesByName = {
+    abap:       ["ABAP"         , "abap"],
     asciidoc:   ["AsciiDoc"     , "asciidoc"],
     c9search:   ["C9Search"     , "c9search_results"],
     coffee:     ["CoffeeScript" , "^Cakefile|coffee|cf"],
@@ -73,6 +74,9 @@ var modesByName = {
     php:        ["PHP"          , "php|phtml"],
     powershell: ["Powershell"   , "ps1"],
     python:     ["Python"       , "py"],
+    r:          ["R"            , "r"],
+    rdoc:       ["RDoc"         , "Rd"],
+    rhtml:      ["RHTML"        , "Rhtml"],
     ruby:       ["Ruby"         , "ru|gemspec|rake|rb"],
     scad:       ["OpenSCAD"     , "scad"],
     scala:      ["Scala"        , "scala"],
@@ -82,6 +86,7 @@ var modesByName = {
     stylus:     ["Stylus"       , "styl|stylus"],
     svg:        ["SVG"          , "svg"],
     tcl:        ["Tcl"          , "tcl"],
+    tex:        ["Tex"          , "tex"],
     text:       ["Text"         , "txt"],
     textile:    ["Textile"      , "textile"],
     typescript: ["Typescript"   , "typescript|ts|str"],
