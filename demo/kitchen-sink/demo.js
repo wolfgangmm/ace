@@ -385,6 +385,11 @@ bindDropdown("split", function(value) {
     }
 });
 
+
+bindCheckbox("elastic_tabstops", function(checked) {
+    env.editor.setUseElasticTabstops(checked);
+});
+
 bindCheckbox("highlight_token", function(checked) {
     var editor = env.editor;
     if (editor.tokenTooltip && !checked) {
