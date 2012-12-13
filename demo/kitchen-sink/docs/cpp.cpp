@@ -16,13 +16,13 @@ int main ()
 
 struct bleh
 {
-	key_t       	ksey;
-	ushort      	uiddddd;	/* owner euid and egid  	*/
-	ushort      	gid;    	/* group id             	*/
-	ushort      	cuid;   	/* creator euid and egid	*/
-	cell-missing	        	/* for test purposes    	*/
-	ushort      	mode;   	/* access modes         	*/
-	ushort      	seq;    	/* sequence number      	*/
+	key_t       	key;
+	ushort      	uid; 	/* owner euid and egid  	*/
+	ushort      	gid; 	/* group id             	*/
+	ushort      	cuid;	/* creator euid and egid	*/
+	cell-missing	     	/* for test purposes    	*/
+	ushort      	mode;	/* access modes         	*/
+	ushort      	seq; 	/* sequence number      	*/
 };
 
 int someDemoCode(	int fred,
