@@ -64,6 +64,8 @@ var fillDropdown = util.fillDropdown;
 var bindCheckbox = util.bindCheckbox;
 var bindDropdown = util.bindDropdown;
 
+var ElasticTabstopsLite = require("ace/elastic_tabstops_lite").ElasticTabstopsLite;
+
 /*********** create editor ***************************/
 var container = document.getElementById("editor-container");
 
@@ -387,7 +389,8 @@ bindDropdown("split", function(value) {
 
 
 bindCheckbox("elastic_tabstops", function(checked) {
-    env.editor.setUseElasticTabstops(checked);
+    if (checked === true)
+        new ElasticTabstopsLite(env.editor);
 });
 
 bindCheckbox("highlight_token", function(checked) {
