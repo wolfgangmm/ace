@@ -60,7 +60,6 @@ function main(args) {
             buildAce({
                 compress: args.indexOf("--m") != -1,
                 noconflict: args.indexOf("--nc") != -1,
-                shrinkwrap: args.indexOf("--s") != -1
             });
         } else if (type == "normal") {
             ace();
@@ -88,7 +87,6 @@ function main(args) {
     console.log("  --h                print this help");
     console.log("  --m                minify");
     console.log("  --nc               namespace require");
-    console.log("  --s                shrinkwrap (combines all output files into one)");
     console.log("");
     if (BUILD_DIR)
         console.log(" output generated in " + type + __dirname + "/" + BUILD_DIR)
@@ -356,7 +354,7 @@ var buildAce = function(options) {
                 require: [ 'ace/mode/' + mode ]
             }],
             filter: getWriteFilters(options, "mode"),
-            dest:   targetDir + "/mode-" + mode + ".js"
+            dest:   targetDir + "/mode/" + mode + ".js"
         });
     });
 
@@ -371,7 +369,7 @@ var buildAce = function(options) {
                 require: ["ace/theme/" + theme]
             }],
             filter: getWriteFilters(options, "theme"),
-            dest:   targetDir + "/theme-" + theme.replace("_theme", "") + ".js"
+            dest:   targetDir + "/theme/" + theme.replace("_theme", "") + ".js"
         });
     });
 
@@ -386,7 +384,7 @@ var buildAce = function(options) {
                 require: [ 'ace/ext/' + ext ]
             }],
             filter: getWriteFilters(options, "ext"),
-            dest:   targetDir + "/ext-" + ext + ".js"
+            dest:   targetDir + "/ext/" + ext + ".js"
         });
     });
 
@@ -401,7 +399,7 @@ var buildAce = function(options) {
                 require: [ 'ace/keyboard/' + keybinding ]
             }],
             filter: getWriteFilters(options, "keybinding"),
-            dest: targetDir + "/keybinding-" + keybinding + ".js"
+            dest: targetDir + "/keybinding/" + keybinding + ".js"
         });
     });
 
@@ -433,18 +431,9 @@ var buildAce = function(options) {
                 worker
             ],
             filter: options.compress ? [copy.filter.uglifyjs] : [],
-            dest: targetDir + "/worker-" + mode + ".js"
+            dest: targetDir + "/mode/" + mode + "_worker.js"
         });
     });
-
-
-    if (options.shrinkwrap) {
-        console.log('# combining files into one ---------');
-        copy({
-          source: { root:targetDir, exclude:/^worker\-/ },
-          dest: BUILD_DIR + '/ace-min.js'
-        });
-    }
     
     return project;
 };
