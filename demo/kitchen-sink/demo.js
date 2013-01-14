@@ -193,40 +193,7 @@ window.onresize = onResize;
 onResize();
 
 /*********** options panel ***************************/
-var docEl = document.getElementById("doc");
-var modeEl = document.getElementById("mode");
-var wrapModeEl = document.getElementById("soft_wrap");
-var themeEl = document.getElementById("theme");
-var foldingEl = document.getElementById("folding");
-var selectStyleEl = document.getElementById("select_style");
-var highlightActiveEl = document.getElementById("highlight_active");
-var showHiddenEl = document.getElementById("show_hidden");
-var showGutterEl = document.getElementById("show_gutter");
-var showPrintMarginEl = document.getElementById("show_print_margin");
-var highlightSelectedWordE = document.getElementById("highlight_selected_word");
-var showHScrollEl = document.getElementById("show_hscroll");
-var animateScrollEl = document.getElementById("animate_scroll");
-var softTabEl = document.getElementById("soft_tab");
-var behavioursEl = document.getElementById("enable_behaviours");
 
-fillDropdown(docEl, doclist.all);
-
-fillDropdown(modeEl, modelist.modes);
-var modesByName = modelist.modesByName;
-bindDropdown("mode", function(value) {
-    env.editor.session.setMode(modesByName[value].mode || modesByName.text.mode);
-    env.editor.session.modeName = value;
-});
-
-bindDropdown("doc", function(name) {
-    doclist.loadDoc(name, function(session) {
-        if (!session)
-            return;
-        session = env.split.setSession(session);
-        updateUIEditorOptions();
-        env.editor.focus();
-    });
-});
 
 function updateUIEditorOptions() {
     var editor = env.editor;
@@ -268,94 +235,6 @@ themeEl.updateTheme = function(){
     themeEl.$timer = null;
 };
 
-bindDropdown("theme", function(value) {
-    if (!value)
-        return;
-    env.editor.setTheme(value);
-    themeEl.selectedValue = value;
-});
-
-bindDropdown("keybinding", function(value) {
-    env.editor.setKeyboardHandler(keybindings[value]);
-});
-
-bindDropdown("fontsize", function(value) {
-    env.split.setFontSize(value);
-});
-
-bindDropdown("folding", function(value) {
-    env.editor.session.setFoldStyle(value);
-    env.editor.setShowFoldWidgets(value !== "manual");
-});
-
-bindDropdown("soft_wrap", function(value) {
-    var session = env.editor.session;
-    var renderer = env.editor.renderer;
-    switch (value) {
-        case "off":
-            session.setUseWrapMode(false);
-            renderer.setPrintMarginColumn(80);
-            break;
-        case "free":
-            session.setUseWrapMode(true);
-            session.setWrapLimitRange(null, null);
-            renderer.setPrintMarginColumn(80);
-            break;
-        default:
-            session.setUseWrapMode(true);
-            var col = parseInt(value, 10);
-            session.setWrapLimitRange(col, col);
-            renderer.setPrintMarginColumn(col);
-    }
-});
-
-bindCheckbox("select_style", function(checked) {
-    env.editor.setSelectionStyle(checked ? "line" : "text");
-});
-
-bindCheckbox("highlight_active", function(checked) {
-    env.editor.setHighlightActiveLine(checked);
-});
-
-bindCheckbox("show_hidden", function(checked) {
-    env.editor.setShowInvisibles(checked);
-});
-
-bindCheckbox("display_indent_guides", function(checked) {
-    env.editor.setDisplayIndentGuides(checked);
-});
-
-bindCheckbox("show_gutter", function(checked) {
-    env.editor.renderer.setShowGutter(checked);
-});
-
-bindCheckbox("show_print_margin", function(checked) {
-    env.editor.renderer.setShowPrintMargin(checked);
-});
-
-bindCheckbox("highlight_selected_word", function(checked) {
-    env.editor.setHighlightSelectedWord(checked);
-});
-
-bindCheckbox("show_hscroll", function(checked) {
-    env.editor.renderer.setHScrollBarAlwaysVisible(checked);
-});
-
-bindCheckbox("animate_scroll", function(checked) {
-    env.editor.setAnimatedScroll(checked);
-});
-
-bindCheckbox("soft_tab", function(checked) {
-    env.editor.session.setUseSoftTabs(checked);
-});
-
-bindCheckbox("enable_behaviours", function(checked) {
-    env.editor.setBehavioursEnabled(checked);
-});
-
-bindCheckbox("fade_fold_widgets", function(checked) {
-    env.editor.setFadeFoldWidgets(checked);
-});
 
 var secondSession = null;
 bindDropdown("split", function(value) {
@@ -382,7 +261,7 @@ bindDropdown("split", function(value) {
     }
 });
 
-bindCheckbox("highlight_token", function(checked) {
+/*bindCheckbox("highlight_token", function(checked) {
     var editor = env.editor;
     if (editor.tokenTooltip && !checked) {
         editor.tokenTooltip.destroy();
@@ -390,7 +269,7 @@ bindCheckbox("highlight_token", function(checked) {
     } else if (checked) {
         editor.tokenTooltip = new TokenTooltip(editor);
     }
-});
+});*/
 
 /************** dragover ***************************/
 event.addListener(container, "dragover", function(e) {
