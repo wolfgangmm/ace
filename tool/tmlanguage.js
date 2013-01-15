@@ -1,5 +1,6 @@
 var fs = require("fs"); 
 var util = require("util");
+var parseLanguage = require("./lib").parsePlist;
 
 // for tracking token states
 var startState = { start: [] }, statesObj = { };
@@ -9,104 +10,48 @@ var args = process.argv.splice(2);
 var tmLanguageFile  = args[0];
 var devMode         = args[1];
 
-var parseString = require("plist").parseString;
-function parseLanguage(languageXml, callback) {
-  parseString(languageXml, function(_, language) {
-    callback(language[0])
-  });
-}
 
 function logDebug(string, obj) {
-  console.log(string, obj);
+    console.log(string, obj);
 }
 
-String.prototype.splice = function( idx, rem, s ) {
-    return (this.slice(0,idx) + s + this.slice(idx + Math.abs(rem)));
-};
 
-String.prototype.replaceAt = function (index, char) {
-  return this.substr(0, index) + char + this.substr(index + 1);
-}
-
-function keyCount(obj) {
-  return Object.keys(obj).length;
-}
-
-/**
-
-Scrubbing is sometimes necessary, but there appears to be no
-automated way to do it...
-
-
-function cleanSingleCapture(match) {
-  // if there's a single "( )", screw that and make it "(?: )"
-  return match.replace("(", "(?:");
-}
-
-function cleanMultiCapture(match) {
-  // regexp will be a quoted string, so turn "\" into "\\"
-  var spaceFinderRegExp = new RegExp("\\\\s.| .", "g");
-  var m;
-  /* 
-   essentially turns things like
-   
-    \\s*(mixin) ([\\w\\-]+)\\s*(\\()
-   
-   into
-   
-   (\\s*mixin)( [\\w\\-]+)(\\s*\\()
-   
-   so that mode parser stops complaining
-  
-  while ((m = spaceFinderRegExp.exec(match)) != null) {
-    var idx = m.index;
-    var nextParenIdx = match.indexOf("(", idx);
-
-    if (nextParenIdx > idx) {
-      match = match.splice(idx, 0, "(").replaceAt(nextParenIdx + 1, '');
-    }
-  }
-
-  //console.log("match", match);
-  return match;
-}
-*/
 
 // stupid yet necessary function, to transform JSON id comments into real comments
 function restoreComments(objStr) {
-  return objStr.replace(/"\s+(\/\/.+)",/g, "\$1").replace(/ \/\/ ERROR/g, '", // ERROR');
+    return objStr.replace(/"\s+(\/\/.+)",/g, "\$1").replace(/ \/\/ ERROR/g, '", // ERROR');
 }
 
 function checkForLookBehind(str) {
-  var lookbehindRegExp = new RegExp("\\?<[=|!]", "g");
-  return lookbehindRegExp.test(str) ? str + " // ERROR: This contains a lookbehind, which JS does not support :(" : str;
+    var lookbehindRegExp = new RegExp("\\?<[=|!]", "g");
+    return lookbehindRegExp.test(str) ? str + " // ERROR: This contains a lookbehind, which JS does not support :(" : str;
 }
 
 function removeXFlag(str) {
-  if (str.slice(0,4) == "(?x)") {
-    str = str.replace(/\\.|\[([^\]\\]|\\.)*?\]|\s+|(?:#[^\n]*)/g, function(s) {
-      if (s[0] == "[")
-        return s;
-      if (s[0] == "\\")
-        return /[#\s]/.test(s[1]) ? s[1] : s;
-      return "";
-    });
-  }
-  return str;
+    if (str && str.slice(0,4) == "(?x)") {
+        str = str.replace(/\\.|\[([^\]\\]|\\.)*?\]|\s+|(?:#[^\n]*)/g, function(s) {
+            if (s[0] == "[")
+                return s;
+            if (s[0] == "\\")
+                return /[#\s]/.test(s[1]) ? s[1] : s;
+            return "";
+        });
+    }
+    return str;
 }
 
 function transformRegExp(str) {
-  str = removeXFlag(str);
-  str = checkForLookBehind(str);
-  return str;
+    str = removeXFlag(str);
+    str = checkForLookBehind(str);
+    return str;
 }
 
 function assembleStateObjs(strState, pattern) {
-  var patterns = pattern.patterns;
-  var stateObj = {};
-  var tokenElem = [];
-  
-  if (patterns) {
+    var patterns = pattern.patterns;
+    var stateObj = {};
+    var tokenElem = [];
+    
+    if (patterns) {
     for (var p in patterns) {
       stateObj = {}; // this is apparently necessary
 
@@ -227,68 +172,64 @@ function extractPatterns(patterns) {
   return restoreComments(JSON.stringify(resultingObj, null, "    "));
 }
 
-function fillTemplate(template, replacements) {
-    return template.replace(/%(.+?)%/g, function(str, m) {
-        return replacements[m] || "";
-    });
-}
+
 
 var modeTemplate = fs.readFileSync(__dirname + "/mode.tmpl.js", "utf8");
 var modeHighlightTemplate = fs.readFileSync(__dirname + "/mode_highlight_rules.tmpl.js", "utf8");
 
 function convertLanguage(name) {
-    var tmLanguage = fs.readFileSync(__dirname + "/" + name, "utf8");
+    var tmLanguage = fs.readFileSync(process.cwd() + "/" + name, "utf8");
     parseLanguage(tmLanguage, function(language) {
-      var languageHighlightFilename = language.name.replace(/[-_]/g, "").toLowerCase();
-      var languageNameSanitized = language.name.replace(/-/g, "");
-      
-      var languageHighlightFile = __dirname + "/../lib/ace/mode/" + languageHighlightFilename + "_highlight_rules.js";
-      var languageModeFile = __dirname + "/../lib/ace/mode/" + languageHighlightFilename + ".js";
-      
-      console.log("Converting " + name + " to " + languageHighlightFile);
+        var languageHighlightFilename = language.name.replace(/[-_]/g, "").toLowerCase();
+        var languageNameSanitized = language.name.replace(/-/g, "");
+        
+        var languageHighlightFile = __dirname + "/../lib/ace/mode/" + languageHighlightFilename + "_highlight_rules.js";
+        var languageModeFile = __dirname + "/../lib/ace/mode/" + languageHighlightFilename + ".js";
+        
+        console.log("Converting " + name + " to " + languageHighlightFile);
       
         if (devMode) {
-          console.log(util.inspect(language.patterns, false, 4));
-          console.log(util.inspect(language.repository, false, 4));
+            console.log(util.inspect(language.patterns, false, 4));
+            console.log(util.inspect(language.repository, false, 4));
         }
         
-        var languageMode = fillTemplate(modeTemplate, {
-              language: languageNameSanitized,
-              languageHighlightFilename: languageHighlightFilename
+        var languageMode = util.fillTemplate(modeTemplate, {
+            language: languageNameSanitized,
+            languageHighlightFilename: languageHighlightFilename
         });
 
         var patterns = extractPatterns(language.patterns);
         var repository = {};
 
         if (language.repository) {
-          for (var r in language.repository) {
-            repository[r] = language.repository[r];
-          }
-          repository = restoreComments(JSON.stringify(repository, null, "    "));
+            for (var r in language.repository) {
+                repository[r] = language.repository[r];
+            }
+            repository = restoreComments(JSON.stringify(repository, null, "    "));
         }
 
-        var languageHighlightRules = fillTemplate(modeHighlightTemplate, {
-              language: languageNameSanitized,
-              languageTokens: patterns,
-              respositoryRules: "/*** START REPOSITORY RULES\n" + repository + "\nEND REPOSITORY RULES ***/",
-              uuid: language.uuid,
-              name: name
+        var languageHighlightRules = util.fillTemplate(modeHighlightTemplate, {
+            language: languageNameSanitized,
+            languageTokens: patterns,
+            respositoryRules: "/*** START REPOSITORY RULES\n" + repository + "\nEND REPOSITORY RULES ***/",
+            uuid: language.uuid,
+            name: name
         });
 
         if (devMode) {
-          console.log(languageMode)
-          console.log(languageHighlightRules)
-          console.log("Not writing, 'cause we're in dev mode, baby.");
+            console.log(languageMode)
+            console.log(languageHighlightRules)
+            console.log("Not writing, 'cause we're in dev mode, baby.");
         }
         else {
-          fs.writeFileSync(languageHighlightFile, languageHighlightRules);
-          fs.writeFileSync(languageModeFile, languageMode);
+            fs.writeFileSync(languageHighlightFile, languageHighlightRules);
+            fs.writeFileSync(languageModeFile, languageMode);
         }
     });
 }
 
 if (tmLanguageFile === undefined) {
-  console.error("Please pass in a language file via the command line.");
-  process.exit(1);
+    console.error("Please pass in a language file via the command line.");
+    process.exit(1);
 }
 convertLanguage(tmLanguageFile);

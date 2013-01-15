@@ -1,15 +1,11 @@
 var fs = require("fs");
 var path = require("path");
 var util = require("util");
+var lib = require("./lib");
 var cssParse = require("css-parse");
 var cssStringify = require("css-stringify");
 
-var parseString = require("plist").parseString;
-function parseTheme(themeXml, callback) {
-    parseString(themeXml, function(_, theme) {
-        callback(theme[0])
-    });
-}
+var parseTheme = lib.parsePlist;
 
 var unsupportedScopes = { };
 
@@ -189,20 +185,6 @@ function parseStyles(styles) {
     return css.join("\n");
 }
 
-function fillTemplate(template, replacements) {
-    return template.replace(/%(.+?)%/g, function(str, m) {
-        return replacements[m] || "";
-    });
-}
-
-function hyphenate(str) {
-    return str.replace(/([A-Z])/g, "-$1").replace(/_/g, "-").toLowerCase();
-}
-
-function quoteString(str) {
-    return '"' + str.replace(/\\/, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\\n") + '"';
-}
-
 var cssTemplate = fs.readFileSync(__dirname + "/Theme.tmpl.css", "utf8");
 var jsTemplate = fs.readFileSync(__dirname + "/Theme.tmpl.js", "utf8");
 
@@ -264,9 +246,9 @@ function convertTheme(name) {
     parseTheme(tmTheme, function(theme) {
         var styles = extractStyles(theme);
 
-        styles.cssClass = "ace-" + hyphenate(name);
+        styles.cssClass = "ace-" + lib.hyphenate(name);
         styles.uuid = theme.uuid;
-        var css = fillTemplate(cssTemplate, styles);
+        var css = lib.fillTemplate(cssTemplate, styles);
         css = css.replace(/[^\{\}]+{\s*}/g, "");
         
         for (var i in supportedScopes) {
@@ -276,10 +258,10 @@ function convertTheme(name) {
                 i.replace(/^|\./g, ".ace_") + "{" + styles[i] + "}";
         }
 
-        var js = fillTemplate(jsTemplate, {
+        var js = lib.fillTemplate(jsTemplate, {
             name: name,
-            css: 'require("../requirejs/text!./' + name + '.css")', // quoteString(css), //
-            cssClass: "ace-" + hyphenate(name),
+            css: 'require("../requirejs/text!./' + name + '.css")', // lib.quoteString(css), //
+            cssClass: "ace-" + lib.hyphenate(name),
             isDark: styles.isDark
         });
 
@@ -291,7 +273,6 @@ function convertTheme(name) {
             var outThemeCss = fs.readFileSync(__dirname + "/../lib/ace/theme/" + name + ".css");
             var oldRules = cssParse(outThemeCss).stylesheet.rules;
             var newRules = cssParse(css).stylesheet.rules;
-
 
             for (var i = 0; i < newRules.length; i++) {
                 var newSelectors = newRules[i].selectors;
