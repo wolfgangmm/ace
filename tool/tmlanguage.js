@@ -1,14 +1,7 @@
 var fs = require("fs"); 
 var util = require("util");
-var parseLanguage = require("./lib").parsePlist;
-
-// for tracking token states
-var startState = { start: [] }, statesObj = { };
-
-
-var args = process.argv.splice(2);
-var tmLanguageFile  = args[0];
-var devMode         = args[1];
+var lib = require("./lib");
+var parseLanguage = lib.parsePlist;
 
 
 function logDebug(string, obj) {
@@ -16,16 +9,90 @@ function logDebug(string, obj) {
 }
 
 
+// tmLanguage processor
 
-// stupid yet necessary function, to transform JSON id comments into real comments
-function restoreComments(objStr) {
-    return objStr.replace(/"\s+(\/\/.+)",/g, "\$1").replace(/ \/\/ ERROR/g, '", // ERROR');
+// for tracking token states
+var states = {start: []}
+var stateName = "start"
+
+function processRules(rules){
+    if (rules.patterns)
+        states.start = processPatterns(rules.patterns);
+    if (rules.repository)
+        processRepository(rules.repository);
+    return states;
+}
+function processRepository(r) {
+    for (var key in r) {
+        var p = r[key];
+        if (p.begin)
+            var stateObj = [processPattern(r[key])]
+        else if (p.patterns && !p.repository)
+            var stateObj = processPatterns(p.patterns)
+        else
+            logDebug("unable to convert", p)
+        if (stateObj)
+            states["#" + key] = stateObj;
+    }
+}    
+function processPatterns(pl) {
+    return pl.map(processPattern)
+}
+function processPattern(p) {
+    if (p.begin && p.end) {
+        var rule = simpleRule(p.begin, p.name, p.beginCaptures)
+        
+        var next = processPatterns(p.patterns || []);
+        var endRule = simpleRule(p.end, p.name, p.endCaptures)
+        next.push(endRule)  
+        
+        if (p.name || p.contentName)
+            next.push({defaultToken: p.name || p.contentName})
+            
+        rule.next = next;
+    }
+    else if (p.match) {
+        var rule = simpleRule(p.match, p.name, p.captures)
+    } 
+    else if (p.include) {
+        var rule =  {include: p.include};
+    }
+    
+    if (p.comment)
+        rule.comment = (rule.comment || "") +  p.comment;
+
+    if (p.repository)
+        processRepository(p.repository)
+    return rule;
+}
+function simpleRule(regex, name, captures) {
+    name = name || "text"
+    
+    regex = transformRegExp(regex)
+    if (captures) {        
+        var tokenArray = []
+        Object.keys(captures).forEach(function(x){
+            tokenArray[x] = captures[x] && captures[x].name
+        })
+        tokenArray
+        if (tokenArray.length == 1)
+            tokenArray = tokenArray[0]
+        else {
+            for (var i = 0; i < tokenArray.length; i++)
+                if (!tokenArray[i])
+                    tokenArray[i] = name;
+        }
+    }
+    
+    try {new RegExp(regex);} catch(e){
+        regex += "    \x00// FIXME: regexp doesn't have js equivalent"
+    }
+    
+    return {token: name, regex: regex};
 }
 
-function checkForLookBehind(str) {
-    var lookbehindRegExp = new RegExp("\\?<[=|!]", "g");
-    return lookbehindRegExp.test(str) ? str + " // ERROR: This contains a lookbehind, which JS does not support :(" : str;
-}
+
+// regex transformation
 
 function removeXFlag(str) {
     if (str && str.slice(0,4) == "(?x)") {
@@ -42,142 +109,26 @@ function removeXFlag(str) {
 
 function transformRegExp(str) {
     str = removeXFlag(str);
-    str = checkForLookBehind(str);
+    str = str.replace(/\\n(?!\?).?/, '$'); // replace newlines by $ except if its postfixed by ?
+    str = str.replace(/\?i\:/, "?:"); // checkForInvariantRegex
+    
     return str;
 }
 
-function assembleStateObjs(strState, pattern) {
-    var patterns = pattern.patterns;
-    var stateObj = {};
-    var tokenElem = [];
+// 
+function extractPatterns(tmRules) {
+    var patterns = processRules(tmRules);
+    return lib.restoreJSONComments(lib.formatJSON(patterns, "    "));
     
-    if (patterns) {
-    for (var p in patterns) {
-      stateObj = {}; // this is apparently necessary
-
-      if (patterns[p].include) {
-        stateObj.include = patterns[p].include;
-      }
-      else {
-        stateObj.token = patterns[p].name;
-        stateObj.regex = transformRegExp(patterns[p].match);
-      }
-      statesObj[strState].push(stateObj);
-    }
-
-    stateObj = {};
-    stateObj.token = "TODO";
-    stateObj.regex = transformRegExp(pattern.end);
-    stateObj.next = "start";
-  }
-  else {
-    stateObj.token = "TODO";
-    stateObj.regex = transformRegExp(pattern.end);
-    stateObj.next = "start";
-
-    statesObj[strState].push(stateObj);
-
-    stateObj = {};
-    stateObj.token = "TODO";
-    stateObj.regex = ".+";
-    stateObj.next = strState;
-  }
-
-  return stateObj;
-}
-
-function extractPatterns(patterns) {
-  var state = 0;
-  patterns.forEach(function(pattern) {
-    state++;
-    var i = 1;
-    var tokenArray = [];
-    var tokenObj = { token: [] };
-    var stateObj = {};
-
-    if (pattern.comment) {
-      startState.start.push("          // " + pattern.comment.trim());
-    }
-
-    // it needs a state transition
-    if (pattern.begin && pattern.end) {
-      var strState = "state_" + state;
-      if ( pattern.beginCaptures === undefined && pattern.endCaptures === undefined) {
-        tokenObj.token.push(pattern.captures);
-      }
-      else if (pattern.beginCaptures) {
-        tokenObj.token.push(pattern.beginCaptures);
-      }
-      else if (pattern.endCaptures) {
-        tokenObj.token.push(pattern.endCaptures);
-      }
-
-      if (tokenObj.token === undefined) {
-        if (pattern.name)
-          tokenObj.token.push(pattern.name);
-        else 
-          logDebug("There's no token name for this state transition", pattern)
-      }
-
-      if (tokenObj.token === undefined) {
-        tokenObj.token.push(pattern.name);
-      }
-
-      statesObj[strState] = [ ];
-      statesObj[strState].push(assembleStateObjs(strState, pattern));
-      
-      tokenObj.regex = transformRegExp(pattern.begin);
-      tokenObj.next = strState;
-    }
-    else if( ( pattern.begin || pattern.end ) && !( pattern.begin && pattern.end ) ) {
-      logDebug("Somehow, there's pattern.begin or pattern.end--but not both?", pattern);
-    }
-
-    else if (pattern.captures) {
-      tokenObj.token.push([]);
-      tokenObj.token.push(pattern.captures);
-      tokenObj.regex = transformRegExp(pattern.match);
-    }
-
-    else if (pattern.match) {
-      tokenObj.token.push(pattern.name);
-      tokenObj.regex = transformRegExp(pattern.match);
-    }
-
-    else if (pattern.include) {
-      tokenObj.token.push(pattern.include);
-      tokenObj.regex = "";
-    }
-
-    else {
-      tokenObj.token.push("");
-      tokenObj.regex = "";
-      logDebug("I've gone through every choice, and have no clue what this is:", pattern);
-    }
-
-    // sometimes captures have names--not sure when or why
-    if (pattern.name) {
-      tokenObj.token.push(pattern.name);
-    }
-
-    startState.start.push(tokenObj);
-  });
-
-  var resultingObj = startState;
-
-  for (var state in statesObj) { 
-    resultingObj[state] = statesObj[state]; 
-  }
-
-  return restoreComments(JSON.stringify(resultingObj, null, "    "));
 }
 
 
 
+// cli stuff
 var modeTemplate = fs.readFileSync(__dirname + "/mode.tmpl.js", "utf8");
 var modeHighlightTemplate = fs.readFileSync(__dirname + "/mode_highlight_rules.tmpl.js", "utf8");
 
-function convertLanguage(name) {
+function convertLanguageFile(name) {
     var tmLanguage = fs.readFileSync(process.cwd() + "/" + name, "utf8");
     parseLanguage(tmLanguage, function(language) {
         var languageHighlightFilename = language.name.replace(/[-_]/g, "").toLowerCase();
@@ -193,25 +144,16 @@ function convertLanguage(name) {
             console.log(util.inspect(language.repository, false, 4));
         }
         
-        var languageMode = util.fillTemplate(modeTemplate, {
+        var languageMode = lib.fillTemplate(modeTemplate, {
             language: languageNameSanitized,
             languageHighlightFilename: languageHighlightFilename
         });
 
-        var patterns = extractPatterns(language.patterns);
-        var repository = {};
+        var patterns = extractPatterns(language);
 
-        if (language.repository) {
-            for (var r in language.repository) {
-                repository[r] = language.repository[r];
-            }
-            repository = restoreComments(JSON.stringify(repository, null, "    "));
-        }
-
-        var languageHighlightRules = util.fillTemplate(modeHighlightTemplate, {
+        var languageHighlightRules = lib.fillTemplate(modeHighlightTemplate, {
             language: languageNameSanitized,
-            languageTokens: patterns,
-            respositoryRules: "/*** START REPOSITORY RULES\n" + repository + "\nEND REPOSITORY RULES ***/",
+            languageTokens: patterns.trim(),
             uuid: language.uuid,
             name: name
         });
@@ -228,8 +170,86 @@ function convertLanguage(name) {
     });
 }
 
+var args = process.argv.splice(2);
+var tmLanguageFile  = args[0];
+var devMode         = args[1];
 if (tmLanguageFile === undefined) {
     console.error("Please pass in a language file via the command line.");
     process.exit(1);
 }
-convertLanguage(tmLanguageFile);
+convertLanguageFile(tmLanguageFile);
+
+
+
+
+
+
+/*
+
+
+var states = {}
+var stateName = "start"
+if (tmRules.patterns)
+    p = processPatterns(tmRules.patterns)
+function processPatterns(pl) {
+    return pl.map(function(p) {
+        if (p.begin && p.end) {
+            var rule = simpleRule(p.begin, p.beginCaptures || p.name)
+            
+            var next = processPatterns(p.patterns || []);
+            var endRule = simpleRule(p.end, p.endCaptures || p.name)
+            next.push(endRule)            
+            if (p.name || p.contentName)
+                next.push({defaultToken: p.name || p.contentName})
+            rule.next = next
+        }
+        else if (p.match) {
+            var rule = simpleRule(p.name, p.name)
+        } 
+        else if (p.include) {
+            var rule =  {include: p.include}
+        }
+        if (p.comment)
+            rule.comment = p.comment;
+        return rule
+    })
+}
+function simpleRule(regex, name) {
+    if (typeof name == "string") {
+        //regex = processRegex(regex)
+    } else {
+        
+    }
+    
+    return {token: name, regex: regex};
+}
+JSON.stringify(p,null, 4)
+#>>
+
+re=/s[/](?!s)/
+re.test("s/s")
+#>>
+re = /\\.|\[(?:[^\]]|.)*\]|(\()(\?[!=:])?|(\))([*+]\?|[*+?]|{\d+,\d*}\??|{,?\d+}\??)?|./g
+
+re1 = /(){1}s[pppp\]()]d(?:s)?op/.source
+#>>
+var parts = []
+while(m = re.exec(re1)) {
+    if (m[1]) {
+         parts.push(m[0])
+    } else if (m[3]) {
+         parts.push(m[0])
+    } else {
+        parts.push(m[0])
+    } 
+    
+}
+
+parts
+
+
+
+
+
+
+*/
