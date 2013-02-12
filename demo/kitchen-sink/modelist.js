@@ -71,6 +71,7 @@ var modesByName = {
     markdown:   ["Markdown"     , "md|markdown"],
     objectivec: ["Objective-C"  , "m"],
     ocaml:      ["OCaml"        , "ml|mli"],
+    pascal:     ["Pascal"       , "pas|p"],
     perl:       ["Perl"         , "pl|pm"],
     pgsql:      ["pgSQL"        , "pgsql"],
     php:        ["PHP"          , "php|phtml"],
